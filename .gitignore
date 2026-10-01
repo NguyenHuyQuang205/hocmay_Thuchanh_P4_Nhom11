@@ -1,0 +1,10 @@
+data/*
+!data/README.md
+
+models/*
+!models/.gitkeep
+
+__pycache__/
+*.pyc
+.venv/
+venv/
