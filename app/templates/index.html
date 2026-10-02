@@ -1,0 +1,185 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ thống Nhận dạng Chim Cánh Cụt</title>
+    <!-- Tich hop Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .penguin-card { background-color: #f8f9fa; border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .result-box { display: none; margin-top: 20px; padding: 15px; border-left: 5px solid #198754; background: #e8f5e9; }
+        .error-box { display: none; margin-top: 20px; padding: 15px; border-left: 5px solid #dc3545; background: #ffebee; }
+    </style>
+</head>
+<body>
+
+<div class="container mt-5">
+    <h2 class="text-center mb-4 text-primary">🐧 HỆ THỐNG GỢI Ý LOÀI CHIM CÁNH CỤT (k-NN)</h2>
+    
+    <!-- THANH DIEU HUONG 3 MAN HINH -->
+    <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="intro-tab" data-bs-toggle="tab" data-bs-target="#intro" type="button" role="tab">1. Giới thiệu & Phạm vi</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="predict-tab" data-bs-toggle="tab" data-bs-target="#predict" type="button" role="tab">2. Thao tác Dự đoán</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="model-tab" data-bs-toggle="tab" data-bs-target="#model" type="button" role="tab">3. Model Card & Giới hạn</button>
+        </li>
+    </ul>
+
+    <!-- NOI DUNG CAC MAN HINH -->
+    <div class="tab-content" id="myTabContent">
+        
+        <!-- Màn hình 1: Giới thiệu -->
+        <div class="tab-pane fade show active" id="intro" role="tabpanel">
+            <div class="penguin-card">
+                <h4>Bối cảnh ứng dụng</h4>
+                <p>Đây là một trang giáo dục sinh thái thuộc <b>Project 04 (Học máy cơ bản)</b>. Ứng dụng cho phép người dùng nhập 4 chỉ số đo lường cơ thể của một cá thể chim cánh cụt để gợi ý xem nó thuộc loài nào trong 3 loài: Adelie, Chinstrap, hoặc Gentoo.</p>
+                <h4>Phạm vi dữ liệu đầu vào</h4>
+                <ul>
+                    <li><b>Chiều dài mỏ (mm):</b> 30 - 65</li>
+                    <li><b>Độ dày mỏ (mm):</b> 10 - 25</li>
+                    <li><b>Chiều dài cánh (mm):</b> 160 - 240</li>
+                    <li><b>Cân nặng (g):</b> 2500 - 6500</li>
+                </ul>
+                <p class="text-danger"><i>*Lưu ý: Ứng dụng sẽ từ chối dự đoán nếu bạn nhập số liệu phi thực tế hoặc để trống dữ liệu nhằm bảo vệ tính toàn vẹn của mô hình.</i></p>
+            </div>
+        </div>
+
+        <!-- Màn hình 2: Dự đoán chính -->
+        <div class="tab-pane fade" id="predict" role="tabpanel">
+            <div class="row">
+                <div class="col-md-5">
+                    <div class="penguin-card">
+                        <h5>Nhập thông số hình thái</h5>
+                        <form id="predictForm">
+                            <div class="mb-3">
+                                <label>Chiều dài mỏ (bill_length_mm)</label>
+                                <input type="number" step="0.1" class="form-control" id="bill_length" required>
+                            </div>
+                            <div class="mb-3">
+                                <label>Độ dày mỏ (bill_depth_mm)</label>
+                                <input type="number" step="0.1" class="form-control" id="bill_depth" required>
+                            </div>
+                            <div class="mb-3">
+                                <label>Chiều dài cánh (flipper_length_mm)</label>
+                                <input type="number" step="1" class="form-control" id="flipper_length" required>
+                            </div>
+                            <div class="mb-3">
+                                <label>Cân nặng (body_mass_g)</label>
+                                <input type="number" step="1" class="form-control" id="body_mass" required>
+                            </div>
+                            <button type="submit" class="btn btn-success w-100">Phân tích & Dự đoán</button>
+                        </form>
+                    </div>
+                </div>
+                
+                <div class="col-md-7">
+                    <!-- Khung Hien Thi Ket Qua -->
+                    <div id="errorBox" class="error-box"></div>
+                    <div id="resultBox" class="result-box">
+                        <h4 class="text-success">Kết quả: Loài <span id="predSpecies" class="fw-bold"></span></h4>
+                        <p>Độ tin cậy: <span id="predConf" class="fw-bold text-primary"></span>%</p>
+                        
+                        <h5 class="mt-4">Giải thích: 5 láng giềng gần nhất</h5>
+                        <table class="table table-sm table-bordered mt-2">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Hạng</th>
+                                    <th>Loài (Thực tế)</th>
+                                    <th>Khoảng cách</th>
+                                    <th>Mỏ (D x R)</th>
+                                    <th>Cánh</th>
+                                    <th>Nặng</th>
+                                </tr>
+                            </thead>
+                            <tbody id="neighborsTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Màn hình 3: Model Card -->
+        <div class="tab-pane fade" id="model" role="tabpanel">
+            <div class="penguin-card">
+                <h4>Model Card (Thẻ thông tin mô hình)</h4>
+                <ul>
+                    <li><b>Thuật toán:</b> k-Nearest Neighbors (k-NN) phân loại đa lớp.</li>
+                    <li><b>Tiền xử lý (Pipeline):</b> Dữ liệu thiếu được điền bằng trung vị (SimpleImputer) và toàn bộ đặc trưng được chuẩn hóa về cùng thang đo bằng StandardScaler.</li>
+                    <li><b>Tham số tối ưu (được chọn qua Cross-Validation):</b> Tùy thuộc vào kết quả rà soát GridSearchCV ở Tuần 3.</li>
+                    <li><b>Giới hạn:</b> Mô hình chỉ học trên tập Palmer Penguins nên không thể áp dụng cho các loài chim cánh cụt ngoài Nam Cực (như chim cánh cụt Galapagos hay hoàng đế).</li>
+                </ul>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Tich hop Javascript de goi API -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    document.getElementById('predictForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        // Reset bang ket qua va loi
+        document.getElementById('resultBox').style.display = 'none';
+        document.getElementById('errorBox').style.display = 'none';
+
+        const payload = {
+            bill_length_mm: document.getElementById('bill_length').value,
+            bill_depth_mm: document.getElementById('bill_depth').value,
+            flipper_length_mm: document.getElementById('flipper_length').value,
+            body_mass_g: document.getElementById('body_mass').value
+        };
+
+        try {
+            const response = await fetch('/api/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            const data = await response.json();
+            
+            // XU LY KHI CO LOI TU API (Sai mien gia tri)
+            if (!response.ok) {
+                const errBox = document.getElementById('errorBox');
+                errBox.innerHTML = `<b>LỖI DỮ LIỆU ĐẦU VÀO:</b> ${data.error}`;
+                errBox.style.display = 'block';
+                return;
+            }
+
+            // XU LY KHI THANH CONG
+            document.getElementById('predSpecies').innerText = data.prediction;
+            document.getElementById('predConf').innerText = data.confidence;
+            
+            // Render bang 5 lang gieng
+            const tbody = document.getElementById('neighborsTable');
+            tbody.innerHTML = '';
+            data.neighbors.forEach((n, idx) => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${idx + 1}</td>
+                        <td class="fw-bold ${n.species === data.prediction ? 'text-success' : 'text-danger'}">${n.species}</td>
+                        <td>${n.distance}</td>
+                        <td>${n.bill_length_mm} x ${n.bill_depth_mm}</td>
+                        <td>${n.flipper_length_mm}</td>
+                        <td>${n.body_mass_g}</td>
+                    </tr>
+                `;
+            });
+            
+            document.getElementById('resultBox').style.display = 'block';
+
+        } catch (err) {
+            alert('Không thể kết nối đến máy chủ API!');
+        }
+    });
+</script>
+</body>
+</html>

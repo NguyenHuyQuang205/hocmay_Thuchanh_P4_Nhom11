@@ -70,7 +70,7 @@ def run_week_3():
     print("=======================================================")
     # Dinh nghia cac tham so can thu nghiem (K tu 1 den 15, Euclid vs Manhattan, uniform vs distance)
     param_grid = {
-        'knn__n_neighbors': [1, 3, 5, 7, 9, 11, 13, 15],
+        'knn__n_neighbors': [ 5, 7, 9, 11, 13, 15],
         'knn__metric': ['euclidean', 'manhattan'],
         'knn__weights': ['uniform', 'distance']
     }
